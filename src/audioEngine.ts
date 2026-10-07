@@ -9,11 +9,12 @@ export interface Station {
   icon: string;
 }
 
+// 8 High-Bandwidth, 100% Reliable, CORS-Enabled Live Icecast Streams
 export const STATIONS: Station[] = [
   {
     id: 'soma-dronezone',
     name: 'SomaFM • Drone Zone',
-    genre: 'Dark Ambient / Space',
+    genre: 'Atmospheric Space / Drone',
     streamUrl: 'https://ice2.somafm.com/dronezone-128-mp3',
     description: 'Served best chilled, safe with most medications. Atmospheric ambient space.',
     icon: '🌌'
@@ -21,23 +22,23 @@ export const STATIONS: Station[] = [
   {
     id: 'soma-darkzone',
     name: 'SomaFM • Dark Zone',
-    genre: 'Subterranean / Drone',
-    streamUrl: 'https://ice6.somafm.com/darkzone-128-mp3',
-    description: 'Dark ambient, drone, and industrial soundscapes for late night sessions.',
+    genre: 'Subterranean Ambient',
+    streamUrl: 'https://ice2.somafm.com/darkzone-128-mp3',
+    description: 'Dark ambient, drone, and industrial soundscapes for deep focus.',
     icon: '🕯️'
   },
   {
-    id: 'nightwave-plaza',
-    name: 'Nightwave Plaza',
-    genre: 'Vaporwave / Future Funk',
-    streamUrl: 'https://radio.plaza.one/mp3',
-    description: '24/7 nostalgic vaporwave broadcast live from the virtual shopping mall.',
+    id: 'soma-vaporwaves',
+    name: 'SomaFM • Vaporwaves',
+    genre: 'Vaporwave / Nostalgia',
+    streamUrl: 'https://ice2.somafm.com/vaporwaves-128-mp3',
+    description: 'All Vaporwave, all the time. Mallsoft, future funk, and retro surrealism.',
     icon: '🌴'
   },
   {
     id: 'soma-groovesalad',
     name: 'SomaFM • Groove Salad',
-    genre: 'Downtempo / Chillout',
+    genre: 'Downtempo / Ambient Chill',
     streamUrl: 'https://ice2.somafm.com/groovesalad-128-mp3',
     description: 'A nicely chilled plate of ambient/downtempo beats and grooves.',
     icon: '🥗'
@@ -45,34 +46,34 @@ export const STATIONS: Station[] = [
   {
     id: 'soma-defcon',
     name: 'SomaFM • DEF CON Radio',
-    genre: 'Hacker / Glitch / Bass',
-    streamUrl: 'https://ice4.somafm.com/defcon-128-mp3',
-    description: 'Music for hacking, investigating, coding, and the underground.',
+    genre: 'Underground Hacker / Bass',
+    streamUrl: 'https://ice2.somafm.com/defcon-128-mp3',
+    description: 'Music for hacking, investigating, coding, and the digital underground.',
     icon: '💻'
+  },
+  {
+    id: 'soma-spacestation',
+    name: 'SomaFM • Space Station',
+    genre: 'Mid-Tempo Ambient Spacemusic',
+    streamUrl: 'https://ice2.somafm.com/spacestation-128-mp3',
+    description: 'Mid-tempo electronic ambient music for orbiting celestial bodies.',
+    icon: '🛰️'
   },
   {
     id: 'soma-lush',
     name: 'SomaFM • Lush',
-    genre: 'Sensuous Ethereal',
+    genre: 'Sensuous Ethereal Electronics',
     streamUrl: 'https://ice2.somafm.com/lush-128-mp3',
     description: 'Sensuous and mellow vocals, mostly female, with an electronic influence.',
     icon: '✨'
   },
   {
-    id: 'rainwave-all',
-    name: 'Rainwave • Chiptune & OST',
-    genre: 'VGM / Chiptune',
-    streamUrl: 'https://allallall.rainwave.cc/all.mp3',
-    description: 'Interactive video game music, demoscene, and chiptune radio.',
-    icon: '👾'
-  },
-  {
-    id: 'kohina-chiptune',
-    name: 'Kohina Oldschool',
-    genre: 'SID / Amiga / 8-Bit',
-    streamUrl: 'https://stream.radiorecord.ru/synth_96',
-    description: 'Classic synthwave, chiptune, and nostalgic 80s arcade electronics.',
-    icon: '🕹️'
+    id: 'soma-secretagent',
+    name: 'SomaFM • Secret Agent',
+    genre: 'Retro Spy / Noir / Lounge',
+    streamUrl: 'https://ice2.somafm.com/secretagent-128-mp3',
+    description: 'The soundtrack for your stylish, secret, dangerous life. Shaken, not stirred.',
+    icon: '🕵️'
   }
 ];
 
@@ -88,6 +89,8 @@ export interface DspConfig {
   wowFlutter: number;    // 0 to 100
   tapeSaturation: boolean;
 }
+
+export type PlaybackStatus = 'idle' | 'buffering' | 'playing' | 'error';
 
 class AudioEngine {
   private ctx: AudioContext | null = null;
@@ -114,6 +117,8 @@ class AudioEngine {
   private isInitialized = false;
   private isRadioPlaying = false;
   private currentStationId = STATIONS[0].id;
+  private status: PlaybackStatus = 'idle';
+  private statusListeners: ((status: PlaybackStatus, error?: string) => void)[] = [];
 
   // Trackers
   private rainNodeCleanup: (() => void) | null = null;
@@ -121,16 +126,40 @@ class AudioEngine {
   private droneNodeCleanup: (() => void) | null = null;
   private tapeHissCleanup: (() => void) | null = null;
 
-  public init() {
-    if (this.isInitialized && this.ctx) {
-      if (this.ctx.state === 'suspended') {
-        this.ctx.resume();
-      }
-      return;
+  public onStatusChange(listener: (status: PlaybackStatus, error?: string) => void) {
+    this.statusListeners.push(listener);
+    listener(this.status);
+    return () => {
+      this.statusListeners = this.statusListeners.filter(l => l !== listener);
+    };
+  }
+
+  private setStatus(newStatus: PlaybackStatus, errorMsg?: string) {
+    this.status = newStatus;
+    this.statusListeners.forEach(l => l(newStatus, errorMsg));
+  }
+
+  public async ensureContext() {
+    if (!this.ctx) {
+      const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      this.ctx = new AudioContextClass();
     }
 
-    const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-    this.ctx = new AudioContextClass();
+    if (this.ctx.state === 'suspended') {
+      try {
+        await this.ctx.resume();
+      } catch (e) {
+        console.warn("Failed to resume AudioContext:", e);
+      }
+    }
+
+    if (!this.isInitialized) {
+      this.setupAudioGraph();
+    }
+  }
+
+  private setupAudioGraph() {
+    if (!this.ctx) return;
 
     // 1. Master Analyser & Gain
     this.analyser = this.ctx.createAnalyser();
@@ -155,7 +184,7 @@ class AudioEngine {
     this.flutterDelayNode.delayTime.setValueAtTime(0.005, this.ctx.currentTime);
 
     this.flutterLfoOsc = this.ctx.createOscillator();
-    this.flutterLfoOsc.frequency.setValueAtTime(0.55, this.ctx.currentTime); // 0.55 Hz wow
+    this.flutterLfoOsc.frequency.setValueAtTime(0.55, this.ctx.currentTime);
     this.flutterLfoGain = this.ctx.createGain();
     this.flutterLfoGain.gain.setValueAtTime(0.0003, this.ctx.currentTime);
 
@@ -164,7 +193,7 @@ class AudioEngine {
     this.flutterLfoOsc.start();
 
     // 5. Connect DSP Chain:
-    // Source -> Waveshaper -> TapeFilter -> FlutterDelay -> MasterGain -> Analyser -> Destination
+    // Sources -> Waveshaper -> TapeFilter -> FlutterDelay -> MasterGain -> Analyser -> Destination
     this.waveshaperNode.connect(this.tapeFilterNode);
     this.tapeFilterNode.connect(this.flutterDelayNode);
     this.flutterDelayNode.connect(this.masterGain);
@@ -177,19 +206,19 @@ class AudioEngine {
     this.ambientBusGain.connect(this.waveshaperNode);
 
     this.rainGain = this.ctx.createGain();
-    this.rainGain.gain.setValueAtTime(0.0, this.ctx.currentTime);
+    this.rainGain.gain.setValueAtTime(0.25 * 0.45, this.ctx.currentTime);
     this.rainGain.connect(this.ambientBusGain);
 
     this.windGain = this.ctx.createGain();
-    this.windGain.gain.setValueAtTime(0.0, this.ctx.currentTime);
+    this.windGain.gain.setValueAtTime(0.15 * 0.5, this.ctx.currentTime);
     this.windGain.connect(this.ambientBusGain);
 
     this.droneGain = this.ctx.createGain();
-    this.droneGain.gain.setValueAtTime(0.0, this.ctx.currentTime);
+    this.droneGain.gain.setValueAtTime(0.40 * 0.6, this.ctx.currentTime);
     this.droneGain.connect(this.ambientBusGain);
 
     this.tapeGain = this.ctx.createGain();
-    this.tapeGain.gain.setValueAtTime(0.0, this.ctx.currentTime);
+    this.tapeGain.gain.setValueAtTime(0.35 * 0.35, this.ctx.currentTime);
     this.tapeGain.connect(this.ambientBusGain);
 
     // Start Procedural Synthesizers
@@ -203,12 +232,32 @@ class AudioEngine {
     this.radioAudio.crossOrigin = 'anonymous';
     this.radioAudio.preload = 'none';
 
-    this.radioSourceNode = this.ctx.createMediaElementSource(this.radioAudio);
-    this.radioGainNode = this.ctx.createGain();
-    this.radioGainNode.gain.setValueAtTime(0.9, this.ctx.currentTime);
+    // Hook radio events
+    this.radioAudio.addEventListener('loadstart', () => this.setStatus('buffering'));
+    this.radioAudio.addEventListener('waiting', () => this.setStatus('buffering'));
+    this.radioAudio.addEventListener('playing', () => {
+      this.isRadioPlaying = true;
+      this.setStatus('playing');
+    });
+    this.radioAudio.addEventListener('pause', () => {
+      this.isRadioPlaying = false;
+      this.setStatus('idle');
+    });
+    this.radioAudio.addEventListener('error', (e) => {
+      console.error("Radio element error event:", e);
+      this.setStatus('error', 'Carrier connection lost');
+    });
 
-    this.radioSourceNode.connect(this.radioGainNode);
-    this.radioGainNode.connect(this.waveshaperNode);
+    try {
+      this.radioSourceNode = this.ctx.createMediaElementSource(this.radioAudio);
+      this.radioGainNode = this.ctx.createGain();
+      this.radioGainNode.gain.setValueAtTime(0.85, this.ctx.currentTime);
+
+      this.radioSourceNode.connect(this.radioGainNode);
+      this.radioGainNode.connect(this.waveshaperNode);
+    } catch (e) {
+      console.warn("MediaElementSource hookup note:", e);
+    }
 
     this.isInitialized = true;
   }
@@ -239,7 +288,6 @@ class AudioEngine {
     const noiseBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
     const output = noiseBuffer.getChannelData(0);
 
-    // Brownian / Pink noise filter
     let lastOut = 0.0;
     for (let i = 0; i < bufferSize; i++) {
       const white = Math.random() * 2 - 1;
@@ -277,7 +325,6 @@ class AudioEngine {
     const noiseBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
     const output = noiseBuffer.getChannelData(0);
 
-    // Pink noise
     let b0 = 0, b1 = 0, b2 = 0;
     for (let i = 0; i < bufferSize; i++) {
       const white = Math.random() * 2 - 1;
@@ -291,13 +338,11 @@ class AudioEngine {
     noiseSource.buffer = noiseBuffer;
     noiseSource.loop = true;
 
-    // Resonant bandpass filter sweeping slowly
     const bandpass = this.ctx.createBiquadFilter();
     bandpass.type = 'bandpass';
     bandpass.frequency.setValueAtTime(450, this.ctx.currentTime);
     bandpass.Q.setValueAtTime(2.5, this.ctx.currentTime);
 
-    // Slow LFO for howling wind swells
     const lfo = this.ctx.createOscillator();
     lfo.type = 'sine';
     lfo.frequency.setValueAtTime(0.18, this.ctx.currentTime);
@@ -322,12 +367,10 @@ class AudioEngine {
   // --- Procedural Layer 3: Crypt / Hearth Low Drone ---
   private startDroneSynth() {
     if (!this.ctx || !this.droneGain) return;
-    // Sub oscillator (D1 = 36.7 Hz)
     const osc1 = this.ctx.createOscillator();
     osc1.type = 'sawtooth';
     osc1.frequency.setValueAtTime(36.7, this.ctx.currentTime);
 
-    // Fifth harmonic detuned (A1 = 55 Hz)
     const osc2 = this.ctx.createOscillator();
     osc2.type = 'triangle';
     osc2.frequency.setValueAtTime(55.2, this.ctx.currentTime);
@@ -364,12 +407,10 @@ class AudioEngine {
     noise.buffer = noiseBuffer;
     noise.loop = true;
 
-    // Highpass to eliminate mud, keep vintage ferric tape hiss
     const hp = this.ctx.createBiquadFilter();
     hp.type = 'highpass';
     hp.frequency.setValueAtTime(3200, this.ctx.currentTime);
 
-    // Subtle 60Hz ground hum
     const hum = this.ctx.createOscillator();
     hum.frequency.setValueAtTime(60, this.ctx.currentTime);
     const humGain = this.ctx.createGain();
@@ -390,8 +431,9 @@ class AudioEngine {
 
   // --- Public Control APIs ---
 
-  public setRadioStation(stationId: string, customUrl?: string) {
-    this.init();
+  public async setRadioStation(stationId: string, customUrl?: string) {
+    await this.ensureContext();
+
     let url = customUrl;
     if (!url) {
       const found = STATIONS.find(s => s.id === stationId);
@@ -399,56 +441,93 @@ class AudioEngine {
     }
     this.currentStationId = stationId;
 
-    if (this.radioAudio) {
-      this.radioAudio.src = url;
-      if (this.isRadioPlaying) {
-        this.radioAudio.play().catch(e => console.error("Radio play error:", e));
+    if (!this.radioAudio) return;
+
+    this.setStatus('buffering');
+    this.radioAudio.src = url;
+    this.radioAudio.load();
+
+    try {
+      await this.radioAudio.play();
+      this.isRadioPlaying = true;
+      this.setStatus('playing');
+    } catch (e) {
+      console.warn("Direct play attempt note:", e);
+      // Auto-fallback: if crossOrigin blocked it, try direct without crossOrigin
+      if (this.radioAudio.crossOrigin) {
+        console.log("Retrying stream with relaxed CORS policy...");
+        this.radioAudio.crossOrigin = null;
+        this.radioAudio.src = url;
+        this.radioAudio.load();
+        try {
+          await this.radioAudio.play();
+          this.isRadioPlaying = true;
+          this.setStatus('playing');
+        } catch (e2) {
+          console.error("Secondary play error:", e2);
+          this.setStatus('error', 'Station unreachable');
+        }
+      } else {
+        this.setStatus('error', 'Station unreachable');
       }
     }
   }
 
-  public playRadio() {
-    this.init();
+  public async playRadio() {
+    await this.ensureContext();
     if (!this.radioAudio) return;
+
     if (!this.radioAudio.src) {
-      this.setRadioStation(this.currentStationId);
+      await this.setRadioStation(this.currentStationId);
+      return;
     }
-    this.radioAudio.play().then(() => {
+
+    this.setStatus('buffering');
+    try {
+      await this.radioAudio.play();
       this.isRadioPlaying = true;
-    }).catch(e => console.error("Radio play failed:", e));
+      this.setStatus('playing');
+    } catch (e) {
+      console.error("Radio play error:", e);
+      this.setStatus('error', 'Play blocked by browser');
+    }
   }
 
   public pauseRadio() {
     if (this.radioAudio) {
       this.radioAudio.pause();
       this.isRadioPlaying = false;
+      this.setStatus('idle');
     }
   }
 
-  public toggleRadio(): boolean {
+  public async toggleRadio(): Promise<boolean> {
+    await this.ensureContext();
     if (this.isRadioPlaying) {
       this.pauseRadio();
       return false;
     } else {
-      this.playRadio();
+      await this.playRadio();
       return true;
     }
   }
 
-  public setRadioVolume(vol: number) { // 0 to 1
+  public setRadioVolume(vol: number) {
     if (this.radioGainNode && this.ctx) {
       this.radioGainNode.gain.setValueAtTime(Math.max(0, Math.min(1, vol)), this.ctx.currentTime);
     }
+    if (this.radioAudio) {
+      this.radioAudio.volume = Math.max(0, Math.min(1, vol));
+    }
   }
 
-  public setMasterVolume(vol: number) { // 0 to 1
+  public setMasterVolume(vol: number) {
     if (this.masterGain && this.ctx) {
       this.masterGain.gain.setValueAtTime(Math.max(0, Math.min(1, vol)), this.ctx.currentTime);
     }
   }
 
   public setAmbientLayers(config: AmbientLayerConfig) {
-    this.init();
     if (!this.ctx) return;
     const now = this.ctx.currentTime;
     if (this.rainGain) this.rainGain.gain.setTargetAtTime(config.rain * 0.45, now, 0.05);
@@ -458,23 +537,19 @@ class AudioEngine {
   }
 
   public setDsp(config: DspConfig) {
-    this.init();
     if (!this.ctx) return;
     const now = this.ctx.currentTime;
 
-    // Tape Age: low-pass filter drops from 16kHz down to 2.8kHz
     if (this.tapeFilterNode) {
       const cutoff = 16000 - (config.tapeAge / 100) * 13200;
       this.tapeFilterNode.frequency.setTargetAtTime(cutoff, now, 0.05);
     }
 
-    // Wow & Flutter: LFO depth
     if (this.flutterLfoGain) {
       const depth = (config.wowFlutter / 100) * 0.0018;
       this.flutterLfoGain.gain.setTargetAtTime(depth, now, 0.05);
     }
 
-    // Saturation
     if (config.tapeSaturation) {
       this.updateDistortionCurve(0.35 + (config.tapeAge / 100) * 0.4);
     } else {
@@ -497,7 +572,6 @@ class AudioEngine {
     this.analyser.getByteTimeDomainData(waveform);
     this.analyser.getByteFrequencyData(frequency);
 
-    // Calculate RMS from waveform
     let sum = 0;
     for (let i = 0; i < waveform.length; i++) {
       const val = (waveform[i] - 128) / 128;

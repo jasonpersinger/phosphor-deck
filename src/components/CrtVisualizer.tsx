@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { audioEngine } from '../audioEngine';
+import type { PlaybackStatus } from '../audioEngine';
 
 export type VisualizerMode = 'oscilloscope' | 'spectrum' | 'vu_meters';
 export type PhosphorTheme = 'green' | 'amber' | 'cyan';
@@ -8,6 +9,7 @@ interface CrtVisualizerProps {
   mode: VisualizerMode;
   theme: PhosphorTheme;
   isPlaying: boolean;
+  status: PlaybackStatus;
   stationName: string;
   genre: string;
 }
@@ -16,6 +18,7 @@ export const CrtVisualizer: React.FC<CrtVisualizerProps> = ({
   mode,
   theme,
   isPlaying,
+  status,
   stationName,
   genre
 }) => {
@@ -339,10 +342,26 @@ export const CrtVisualizer: React.FC<CrtVisualizerProps> = ({
       {/* Upper Status Telemetry Bar */}
       <div className="flex items-center justify-between px-4 py-2 border-b border-black/40 bg-black/60 text-xs font-mono tracking-wider z-30 relative select-none">
         <div className="flex items-center space-x-3">
-          <span className="flex items-center space-x-1">
-            <span className={`inline-block w-2 h-2 rounded-full ${isPlaying ? 'bg-[#39ff7a] animate-pulse shadow-[0_0_8px_#39ff7a]' : 'bg-red-500/50'}`}></span>
-            <span className={isPlaying ? 'text-[#39ff7a]' : 'text-zinc-500'}>
-              {isPlaying ? 'CARRIER LOCK' : 'STANDBY'}
+          <span className="flex items-center space-x-1.5">
+            <span className={`inline-block w-2 h-2 rounded-full ${
+              status === 'playing'
+                ? 'bg-[#39ff7a] shadow-[0_0_8px_#39ff7a]'
+                : status === 'buffering'
+                ? 'bg-amber-400 animate-ping shadow-[0_0_8px_#fbbf24]'
+                : status === 'error'
+                ? 'bg-red-500 shadow-[0_0_8px_#ef4444]'
+                : 'bg-zinc-600'
+            }`}></span>
+            <span className={
+              status === 'playing' 
+                ? 'text-[#39ff7a] font-bold' 
+                : status === 'buffering' 
+                ? 'text-amber-400 font-bold animate-pulse' 
+                : status === 'error' 
+                ? 'text-red-400 font-bold' 
+                : 'text-zinc-500'
+            }>
+              {status === 'playing' ? 'CARRIER LOCK' : status === 'buffering' ? 'TUNING CARRIER...' : status === 'error' ? 'CARRIER LOST' : 'STANDBY'}
             </span>
           </span>
           <span className="text-zinc-600">|</span>

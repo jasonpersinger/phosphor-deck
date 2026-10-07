@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 
 import { audioEngine, STATIONS } from './audioEngine';
-import type { AmbientLayerConfig, DspConfig } from './audioEngine';
+import type { AmbientLayerConfig, DspConfig, PlaybackStatus } from './audioEngine';
 import { CrtVisualizer } from './components/CrtVisualizer';
 import type { VisualizerMode, PhosphorTheme } from './components/CrtVisualizer';
 import { AmbientMixer } from './components/AmbientMixer';
@@ -17,6 +17,7 @@ import { StationTuner } from './components/StationTuner';
 
 export function App() {
   const [isPlaying, setIsPlaying] = useState(false);
+  const [playbackStatus, setPlaybackStatus] = useState<PlaybackStatus>('idle');
   const [currentStationId, setCurrentStationId] = useState(STATIONS[0].id);
   const [visualizerMode, setVisualizerMode] = useState<VisualizerMode>('oscilloscope');
   const [theme, setTheme] = useState<PhosphorTheme>('green');
@@ -97,6 +98,19 @@ export function App() {
     return () => clearInterval(interval);
   }, [sleepRemainingSeconds]);
 
+  // Subscribe to Audio Engine Playback Status & Initial Sync
+  useEffect(() => {
+    audioEngine.setAmbientLayers(ambientLayers);
+    audioEngine.setDsp(dspConfig);
+
+    const unsub = audioEngine.onStatusChange((status) => {
+      setPlaybackStatus(status);
+      setIsPlaying(status === 'playing' || status === 'buffering');
+    });
+
+    return unsub;
+  }, []);
+
   const handleSetSleepTimer = (mins: number | null) => {
     setSleepMinutes(mins);
     if (mins) {
@@ -106,18 +120,14 @@ export function App() {
     }
   };
 
-  const handleTogglePlay = () => {
-    const playing = audioEngine.toggleRadio();
+  const handleTogglePlay = async () => {
+    const playing = await audioEngine.toggleRadio();
     setIsPlaying(playing);
   };
 
-  const handleSelectStation = (stationId: string, customUrl?: string) => {
+  const handleSelectStation = async (stationId: string, customUrl?: string) => {
     setCurrentStationId(stationId);
-    audioEngine.setRadioStation(stationId, customUrl);
-    if (!isPlaying) {
-      audioEngine.playRadio();
-      setIsPlaying(true);
-    }
+    await audioEngine.setRadioStation(stationId, customUrl);
   };
 
   const handleToggleMute = () => {
@@ -275,6 +285,7 @@ export function App() {
               mode={visualizerMode}
               theme={theme}
               isPlaying={isPlaying}
+              status={playbackStatus}
               stationName={currentStation.name}
               genre={currentStation.genre}
             />
@@ -287,6 +298,7 @@ export function App() {
           <StationTuner
             currentStationId={currentStationId}
             isPlaying={isPlaying}
+            status={playbackStatus}
             onSelectStation={handleSelectStation}
             onTogglePlay={handleTogglePlay}
             theme={theme}

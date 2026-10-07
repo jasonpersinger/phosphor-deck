@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import { Radio, Plus, Check, Play, Pause, ExternalLink } from 'lucide-react';
 import { STATIONS } from '../audioEngine';
+import type { PlaybackStatus } from '../audioEngine';
 
 interface StationTunerProps {
   currentStationId: string;
   isPlaying: boolean;
+  status: PlaybackStatus;
   onSelectStation: (stationId: string, customUrl?: string) => void;
   onTogglePlay: () => void;
   theme: 'green' | 'amber' | 'cyan';
@@ -13,6 +15,7 @@ interface StationTunerProps {
 export const StationTuner: React.FC<StationTunerProps> = ({
   currentStationId,
   isPlaying,
+  status,
   onSelectStation,
   onTogglePlay,
   theme
@@ -111,7 +114,15 @@ export const StationTuner: React.FC<StationTunerProps> = ({
               {/* Active Indicator LED */}
               {isSelected && (
                 <div className="absolute top-1.5 left-1.5 flex items-center space-x-1">
-                  <span className={`w-1.5 h-1.5 rounded-full ${activeDot} animate-ping`}></span>
+                  <span className={`w-1.5 h-1.5 rounded-full ${
+                    status === 'playing'
+                      ? `${activeDot} animate-ping`
+                      : status === 'buffering'
+                      ? 'bg-amber-400 animate-ping'
+                      : status === 'error'
+                      ? 'bg-red-500'
+                      : 'bg-zinc-600'
+                  }`}></span>
                 </div>
               )}
             </button>
