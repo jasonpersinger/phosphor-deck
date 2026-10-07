@@ -9,24 +9,8 @@ export interface Station {
   icon: string;
 }
 
-// 8 Verified, Fast, High-Bandwidth Live Audio Streams
+// 8 Verified, Fast, High-Bandwidth Live Audio Streams (Modern CDNs, No Icecast/CORS blocks)
 export const STATIONS: Station[] = [
-  {
-    id: 'soma-dronezone',
-    name: 'SomaFM • Drone Zone',
-    genre: 'Atmospheric Space / Drone',
-    streamUrl: 'https://ice4.somafm.com/dronezone-128-mp3',
-    description: 'Served best chilled, safe with most medications. Atmospheric ambient space.',
-    icon: '🌌'
-  },
-  {
-    id: 'soma-darkzone',
-    name: 'SomaFM • Dark Zone',
-    genre: 'Subterranean Ambient',
-    streamUrl: 'https://ice4.somafm.com/darkzone-128-mp3',
-    description: 'Dark ambient, drone, and industrial soundscapes for deep focus.',
-    icon: '🕯️'
-  },
   {
     id: 'nightwave-plaza',
     name: 'Nightwave Plaza',
@@ -36,12 +20,12 @@ export const STATIONS: Station[] = [
     icon: '🌴'
   },
   {
-    id: 'rp-mellow',
-    name: 'Radio Paradise • Mellow',
-    genre: 'Downtempo / Warm Chill',
-    streamUrl: 'https://stream.radioparadise.com/mellow-128',
-    description: 'Ultra-clean audiophile mix of acoustic, ambient, and mellow rhythms.',
-    icon: '☕'
+    id: 'ambient-sleeping-pill',
+    name: 'Ambient Sleeping Pill',
+    genre: 'Dark Ambient / Space Drone',
+    streamUrl: 'https://radio.stereoscenic.com/asp-h',
+    description: 'Deep, subterranean ambient and cosmic drone for deep focus and sleep.',
+    icon: '🌌'
   },
   {
     id: 'hunter-lofi',
@@ -52,20 +36,12 @@ export const STATIONS: Station[] = [
     icon: '🎧'
   },
   {
-    id: 'soma-groovesalad',
-    name: 'SomaFM • Groove Salad',
-    genre: 'Downtempo / Ambient Chill',
-    streamUrl: 'https://ice4.somafm.com/groovesalad-128-mp3',
-    description: 'A nicely chilled plate of ambient/downtempo beats and grooves.',
-    icon: '🥗'
-  },
-  {
-    id: 'soma-defcon',
-    name: 'SomaFM • DEF CON Radio',
-    genre: 'Underground Hacker / Bass',
-    streamUrl: 'https://ice4.somafm.com/defcon-128-mp3',
-    description: 'Music for hacking, investigating, coding, and the digital underground.',
-    icon: '💻'
+    id: 'rp-mellow',
+    name: 'Radio Paradise • Mellow',
+    genre: 'Downtempo / Warm Chill',
+    streamUrl: 'https://stream.radioparadise.com/mellow-128',
+    description: 'Ultra-clean audiophile mix of acoustic, ambient, and mellow rhythms.',
+    icon: '☕'
   },
   {
     id: 'rp-main',
@@ -74,8 +50,33 @@ export const STATIONS: Station[] = [
     streamUrl: 'https://stream.radioparadise.com/mp3-128',
     description: 'Commercial-free world-class eclectic music curated by real humans.',
     icon: '📻'
+  },
+  {
+    id: 'rp-eclectic',
+    name: 'Radio Paradise • Eclectic',
+    genre: 'Electronic & World Grooves',
+    streamUrl: 'https://stream.radioparadise.com/eclectic-128',
+    description: 'Chilled electronic, acoustic world fusion, and melodic ambient beats.',
+    icon: '✨'
+  },
+  {
+    id: 'rp-rock',
+    name: 'Radio Paradise • Rock',
+    genre: 'Progressive & Classic Rock',
+    streamUrl: 'https://stream.radioparadise.com/rock-128',
+    description: 'High-energy progressive, classic, and underground alternative rock.',
+    icon: '🎸'
+  },
+  {
+    id: 'kexp-seattle',
+    name: 'KEXP 90.3 Seattle',
+    genre: 'Underground & Freeform',
+    streamUrl: 'https://kexp-mp3-128.streamguys1.com/kexp128.mp3',
+    description: 'Where the music matters. Freeform independent underground radio.',
+    icon: '🎙️'
   }
 ];
+
 
 export interface AmbientLayerConfig {
   rain: number;
