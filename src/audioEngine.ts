@@ -15,7 +15,7 @@ export const STATIONS: Station[] = [
     id: 'kobold-fm',
     name: 'Kobold.FM (Subterranean Radio)',
     genre: 'Dungeon Synth / Medieval Tapes',
-    streamUrl: 'http://voidberry.local:8085/listen/kobold.fm/radio.mp3',
+    streamUrl: 'https://kobold.messy.quest/listen/kobold.fm/radio.mp3',
     description: '24/7 subterranean dungeon synth broadcast live from voidberry.',
     icon: '🦎'
   },
