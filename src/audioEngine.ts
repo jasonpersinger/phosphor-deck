@@ -9,12 +9,13 @@ export interface Station {
   icon: string;
 }
 
+// 8 Verified, Fast, High-Bandwidth Live Audio Streams
 export const STATIONS: Station[] = [
   {
     id: 'soma-dronezone',
     name: 'SomaFM • Drone Zone',
     genre: 'Atmospheric Space / Drone',
-    streamUrl: 'https://ice2.somafm.com/dronezone-128-mp3',
+    streamUrl: 'https://ice4.somafm.com/dronezone-128-mp3',
     description: 'Served best chilled, safe with most medications. Atmospheric ambient space.',
     icon: '🌌'
   },
@@ -22,7 +23,7 @@ export const STATIONS: Station[] = [
     id: 'soma-darkzone',
     name: 'SomaFM • Dark Zone',
     genre: 'Subterranean Ambient',
-    streamUrl: 'https://ice2.somafm.com/darkzone-128-mp3',
+    streamUrl: 'https://ice4.somafm.com/darkzone-128-mp3',
     description: 'Dark ambient, drone, and industrial soundscapes for deep focus.',
     icon: '🕯️'
   },
@@ -35,18 +36,26 @@ export const STATIONS: Station[] = [
     icon: '🌴'
   },
   {
-    id: 'soma-vaporwaves',
-    name: 'SomaFM • Vaporwaves',
-    genre: 'Vaporwave / Mallsoft',
-    streamUrl: 'https://ice2.somafm.com/vaporwaves-128-mp3',
-    description: 'All Vaporwave, all the time. Mallsoft, future funk, and retro surrealism.',
-    icon: '📼'
+    id: 'rp-mellow',
+    name: 'Radio Paradise • Mellow',
+    genre: 'Downtempo / Warm Chill',
+    streamUrl: 'https://stream.radioparadise.com/mellow-128',
+    description: 'Ultra-clean audiophile mix of acoustic, ambient, and mellow rhythms.',
+    icon: '☕'
+  },
+  {
+    id: 'hunter-lofi',
+    name: 'Hunter • Lofi Chill',
+    genre: 'Lofi Beats / Study Tape',
+    streamUrl: 'https://live.hunter.fm/lofi_high',
+    description: 'Dusty vinyl grooves, relaxed jazz chords, and mellow study beats.',
+    icon: '🎧'
   },
   {
     id: 'soma-groovesalad',
     name: 'SomaFM • Groove Salad',
     genre: 'Downtempo / Ambient Chill',
-    streamUrl: 'https://ice2.somafm.com/groovesalad-128-mp3',
+    streamUrl: 'https://ice4.somafm.com/groovesalad-128-mp3',
     description: 'A nicely chilled plate of ambient/downtempo beats and grooves.',
     icon: '🥗'
   },
@@ -54,25 +63,17 @@ export const STATIONS: Station[] = [
     id: 'soma-defcon',
     name: 'SomaFM • DEF CON Radio',
     genre: 'Underground Hacker / Bass',
-    streamUrl: 'https://ice2.somafm.com/defcon-128-mp3',
+    streamUrl: 'https://ice4.somafm.com/defcon-128-mp3',
     description: 'Music for hacking, investigating, coding, and the digital underground.',
     icon: '💻'
   },
   {
-    id: 'soma-spacestation',
-    name: 'SomaFM • Space Station',
-    genre: 'Mid-Tempo Ambient Spacemusic',
-    streamUrl: 'https://ice2.somafm.com/spacestation-128-mp3',
-    description: 'Mid-tempo electronic ambient music for orbiting celestial bodies.',
-    icon: '🛰️'
-  },
-  {
-    id: 'soma-lush',
-    name: 'SomaFM • Lush',
-    genre: 'Sensuous Ethereal Electronics',
-    streamUrl: 'https://ice2.somafm.com/lush-128-mp3',
-    description: 'Sensuous and mellow vocals, mostly female, with an electronic influence.',
-    icon: '✨'
+    id: 'rp-main',
+    name: 'Radio Paradise • Main',
+    genre: 'Eclectic Audiophile',
+    streamUrl: 'https://stream.radioparadise.com/mp3-128',
+    description: 'Commercial-free world-class eclectic music curated by real humans.',
+    icon: '📻'
   }
 ];
 
@@ -118,6 +119,7 @@ class AudioEngine {
 
   private isInitialized = false;
   private isRadioPlaying = false;
+  private isSwitchingStation = false;
   private currentStationId = STATIONS[0].id;
   private status: PlaybackStatus = 'idle';
   private statusListeners: ((status: PlaybackStatus, error?: string) => void)[] = [];
@@ -206,9 +208,8 @@ class AudioEngine {
     this.analyser.connect(this.ctx.destination);
 
     // 6. Visualizer Carrier Simulation Nodes
-    // Provides rich waveforms & spectrum movement for radio stream
     this.visualizerCarrierGain = this.ctx.createGain();
-    this.visualizerCarrierGain.gain.setValueAtTime(0.0, this.ctx.currentTime); // inaudible to master, fed to analyser
+    this.visualizerCarrierGain.gain.setValueAtTime(0.0, this.ctx.currentTime);
 
     const visFilter = this.ctx.createBiquadFilter();
     visFilter.type = 'lowpass';
@@ -285,18 +286,24 @@ class AudioEngine {
 
     this.radioAudio.addEventListener('canplay', () => {
       if (this.isRadioPlaying) {
+        this.isSwitchingStation = false;
         this.setStatus('playing');
         this.setVisualizerCarrier(true);
       }
     });
 
     this.radioAudio.addEventListener('playing', () => {
+      this.isSwitchingStation = false;
       this.isRadioPlaying = true;
       this.setStatus('playing');
       this.setVisualizerCarrier(true);
     });
 
     this.radioAudio.addEventListener('pause', () => {
+      // If we are actively switching stations, ignore the automatic pause of the old URL!
+      if (this.isSwitchingStation) {
+        return;
+      }
       this.isRadioPlaying = false;
       this.setVisualizerCarrier(false);
       this.setStatus('idle');
@@ -304,8 +311,10 @@ class AudioEngine {
 
     this.radioAudio.addEventListener('error', () => {
       const err = this.radioAudio?.error;
-      // Code 1 is just an aborted request when switching stations, not a failure
-      if (err && err.code === 1) return;
+      // Code 1 is MEDIA_ERR_ABORTED (normal when switching tracks)
+      if (!err || err.code === 1 || this.isSwitchingStation) {
+        return;
+      }
       console.warn("Audio element error reported:", err);
       this.setVisualizerCarrier(false);
       this.setStatus('error', 'Carrier connection lost');
@@ -502,17 +511,26 @@ class AudioEngine {
     }
     if (!this.radioAudio) return;
 
+    this.isSwitchingStation = true;
+    this.isRadioPlaying = true;
     this.setStatus('buffering');
+
+    // Update stream source
     this.radioAudio.src = url;
+    this.radioAudio.volume = this.radioVol * this.masterVol;
 
     try {
       await this.radioAudio.play();
-      this.isRadioPlaying = true;
+      this.isSwitchingStation = false;
       this.setStatus('playing');
       this.setVisualizerCarrier(true);
-    } catch (e) {
+    } catch (e: unknown) {
+      const err = e as { name?: string };
+      // AbortError is normal when switching quickly between stations or buffering
+      if (err?.name === 'AbortError') {
+        return;
+      }
       console.warn("Play on station switch exception:", e);
-      // If error wasn't an intentional user abort, notify status
       if (this.radioAudio.error && this.radioAudio.error.code !== 1) {
         this.setStatus('error', 'Carrier connection lost');
       }
@@ -531,20 +549,25 @@ class AudioEngine {
       return;
     }
 
+    this.isRadioPlaying = true;
     this.setStatus('buffering');
     try {
       await this.radioAudio.play();
-      this.isRadioPlaying = true;
       this.setStatus('playing');
       this.setVisualizerCarrier(true);
-    } catch (e) {
+    } catch (e: unknown) {
+      const err = e as { name?: string };
+      if (err?.name === 'AbortError') {
+        return;
+      }
       console.warn("Radio play exception:", e);
-      this.setStatus('error', 'Play blocked by browser policy');
+      this.setStatus('error', 'Carrier connection lost');
     }
   }
 
   public pauseRadio() {
     if (this.radioAudio) {
+      this.isSwitchingStation = false;
       this.radioAudio.pause();
       this.isRadioPlaying = false;
       this.setVisualizerCarrier(false);
