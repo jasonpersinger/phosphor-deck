@@ -12,6 +12,14 @@ export interface Station {
 // 8 Verified, Fast, High-Bandwidth Live Audio Streams (Including Dedicated 24/7 Dungeon Synth)
 export const STATIONS: Station[] = [
   {
+    id: 'kobold-fm',
+    name: 'Kobold.FM (Subterranean Radio)',
+    genre: 'Dungeon Synth / Medieval Tapes',
+    streamUrl: 'http://voidberry.local:8085/listen/kobold.fm/radio.mp3',
+    description: '24/7 subterranean dungeon synth broadcast live from voidberry.',
+    icon: '🦎'
+  },
+  {
     id: 'caprice-dungeon-synth',
     name: 'Caprice • Dungeon Synth',
     genre: 'Dungeon Synth / Medieval',
