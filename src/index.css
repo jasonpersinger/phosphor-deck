@@ -1,0 +1,155 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --phosphor-green: #39ff7a;
+    --phosphor-green-glow: rgba(57, 255, 122, 0.45);
+    --phosphor-green-dim: rgba(57, 255, 122, 0.15);
+
+    --phosphor-amber: #ffb830;
+    --phosphor-amber-glow: rgba(255, 184, 48, 0.45);
+    --phosphor-amber-dim: rgba(255, 184, 48, 0.15);
+
+    --phosphor-cyan: #3fe8ff;
+    --phosphor-cyan-glow: rgba(63, 232, 255, 0.45);
+    --phosphor-cyan-dim: rgba(63, 232, 255, 0.15);
+  }
+
+  body {
+    font-family: 'Share Tech Mono', monospace;
+    background-color: #0c0e10;
+    color: #abbbc0;
+  }
+}
+
+.font-mono-tech {
+  font-family: 'Share Tech Mono', monospace;
+}
+
+.font-pixel {
+  font-family: 'VT323', monospace;
+}
+
+.font-tech {
+  font-family: 'Chakra Petch', sans-serif;
+}
+
+/* CRT Scanlines Overlay */
+.crt-screen {
+  position: relative;
+  overflow: hidden;
+  background: radial-gradient(ellipse at center, #09120e 0%, #030604 100%);
+  box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.95), 0 0 10px rgba(0, 0, 0, 0.6);
+}
+
+.crt-amber {
+  background: radial-gradient(ellipse at center, #150e05 0%, #060401 100%) !important;
+}
+
+.crt-cyan {
+  background: radial-gradient(ellipse at center, #051114 0%, #010406 100%) !important;
+}
+
+.crt-scanlines::before {
+  content: " ";
+  display: block;
+  position: absolute;
+  top: 0; left: 0; bottom: 0; right: 0;
+  background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.45) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.04), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.04));
+  z-index: 20;
+  background-size: 100% 3px, 6px 100%;
+  pointer-events: none;
+  opacity: 0.85;
+}
+
+/* Glass Reflection overlay */
+.crt-glass::after {
+  content: " ";
+  display: block;
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.01) 35%, transparent 60%);
+  pointer-events: none;
+  z-index: 25;
+}
+
+/* Phosphor Glows */
+.glow-green {
+  color: #39ff7a;
+  text-shadow: 0 0 3px #39ff7a, 0 0 8px rgba(57, 255, 122, 0.5);
+}
+
+.glow-amber {
+  color: #ffb830;
+  text-shadow: 0 0 3px #ffb830, 0 0 8px rgba(255, 184, 48, 0.5);
+}
+
+.glow-cyan {
+  color: #3fe8ff;
+  text-shadow: 0 0 3px #3fe8ff, 0 0 8px rgba(63, 232, 255, 0.5);
+}
+
+/* Brushed Aluminum Panel */
+.hifi-chassis {
+  background: linear-gradient(180deg, #1f2327 0%, #171a1d 30%, #121417 100%);
+  box-shadow: 
+    0 30px 60px -12px rgba(0, 0, 0, 0.85),
+    inset 0 1px 1px rgba(255, 255, 255, 0.15),
+    inset 0 -1px 2px rgba(0, 0, 0, 0.7);
+  border: 1px solid #282d33;
+}
+
+/* Inset Hardware Panels */
+.inset-bezel {
+  background: #090b0d;
+  box-shadow: 
+    inset 0 3px 6px rgba(0, 0, 0, 0.85),
+    inset 0 1px 2px rgba(0, 0, 0, 0.9),
+    0 1px 1px rgba(255, 255, 255, 0.05);
+  border: 1px solid #1a1e22;
+}
+
+/* Knurled Aluminum Knob / Fader Thumb */
+input[type=range] {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+}
+
+input[type=range]:focus {
+  outline: none;
+}
+
+input[type=range]::-webkit-slider-runnable-track {
+  height: 6px;
+  background: #090c0e;
+  border: 1px solid #1c2126;
+  border-radius: 2px;
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.8);
+}
+
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 20px;
+  width: 14px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, #5b646c 0%, #30363d 50%, #202428 100%);
+  border: 1px solid #6b7782;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.4);
+  cursor: pointer;
+  margin-top: -7px;
+}
+
+/* Subtle Flicker Animation */
+@keyframes crt-flicker {
+  0% { opacity: 0.985; }
+  50% { opacity: 1; }
+  52% { opacity: 0.98; }
+  54% { opacity: 1; }
+  100% { opacity: 0.99; }
+}
+
+.flicker {
+  animation: crt-flicker 0.15s infinite;
+}
