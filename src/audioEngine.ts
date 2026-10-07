@@ -9,15 +9,15 @@ export interface Station {
   icon: string;
 }
 
-// 8 Verified, Fast, High-Bandwidth Live Audio Streams (Modern CDNs, No Icecast/CORS blocks)
+// 8 Verified, Fast, High-Bandwidth Live Audio Streams (Including Dedicated 24/7 Dungeon Synth)
 export const STATIONS: Station[] = [
   {
-    id: 'nightwave-plaza',
-    name: 'Nightwave Plaza',
-    genre: 'Vaporwave / Future Funk',
-    streamUrl: 'https://radio.plaza.one/mp3',
-    description: '24/7 nostalgic vaporwave broadcast live from the virtual shopping mall.',
-    icon: '🌴'
+    id: 'caprice-dungeon-synth',
+    name: 'Caprice • Dungeon Synth',
+    genre: 'Dungeon Synth / Medieval',
+    streamUrl: 'http://79.120.12.130:8000/dungeonsynth',
+    description: '24/7 dedicated Dungeon Synth, medieval fantasy ambient, and dark crypt soundscapes.',
+    icon: '⚔️'
   },
   {
     id: 'ambient-sleeping-pill',
@@ -26,6 +26,14 @@ export const STATIONS: Station[] = [
     streamUrl: 'https://radio.stereoscenic.com/asp-h',
     description: 'Deep, subterranean ambient and cosmic drone for deep focus and sleep.',
     icon: '🌌'
+  },
+  {
+    id: 'nightwave-plaza',
+    name: 'Nightwave Plaza',
+    genre: 'Vaporwave / Future Funk',
+    streamUrl: 'https://radio.plaza.one/mp3',
+    description: '24/7 nostalgic vaporwave broadcast live from the virtual shopping mall.',
+    icon: '🌴'
   },
   {
     id: 'hunter-lofi',
@@ -58,14 +66,6 @@ export const STATIONS: Station[] = [
     streamUrl: 'https://stream.radioparadise.com/eclectic-128',
     description: 'Chilled electronic, acoustic world fusion, and melodic ambient beats.',
     icon: '✨'
-  },
-  {
-    id: 'rp-rock',
-    name: 'Radio Paradise • Rock',
-    genre: 'Progressive & Classic Rock',
-    streamUrl: 'https://stream.radioparadise.com/rock-128',
-    description: 'High-energy progressive, classic, and underground alternative rock.',
-    icon: '🎸'
   },
   {
     id: 'kexp-seattle',
@@ -105,11 +105,6 @@ class AudioEngine {
   private flutterDelayNode: DelayNode | null = null;
   private flutterLfoGain: GainNode | null = null;
   private flutterLfoOsc: OscillatorNode | null = null;
-
-  // Visualizer carrier oscillator (drives CRT meters during radio playback)
-  private visualizerCarrierGain: GainNode | null = null;
-  private visualizerCarrierOsc1: OscillatorNode | null = null;
-  private visualizerCarrierOsc2: OscillatorNode | null = null;
 
   // Ambient Layer Nodes
   private ambientBusGain: GainNode | null = null;
@@ -208,31 +203,7 @@ class AudioEngine {
     this.masterGain.connect(this.analyser);
     this.analyser.connect(this.ctx.destination);
 
-    // 6. Visualizer Carrier Simulation Nodes
-    this.visualizerCarrierGain = this.ctx.createGain();
-    this.visualizerCarrierGain.gain.setValueAtTime(0.0, this.ctx.currentTime);
-
-    const visFilter = this.ctx.createBiquadFilter();
-    visFilter.type = 'lowpass';
-    visFilter.frequency.setValueAtTime(600, this.ctx.currentTime);
-
-    this.visualizerCarrierOsc1 = this.ctx.createOscillator();
-    this.visualizerCarrierOsc1.type = 'triangle';
-    this.visualizerCarrierOsc1.frequency.setValueAtTime(65, this.ctx.currentTime);
-
-    this.visualizerCarrierOsc2 = this.ctx.createOscillator();
-    this.visualizerCarrierOsc2.type = 'sine';
-    this.visualizerCarrierOsc2.frequency.setValueAtTime(130, this.ctx.currentTime);
-
-    this.visualizerCarrierOsc1.connect(visFilter);
-    this.visualizerCarrierOsc2.connect(visFilter);
-    visFilter.connect(this.visualizerCarrierGain);
-    this.visualizerCarrierGain.connect(this.analyser);
-
-    this.visualizerCarrierOsc1.start();
-    this.visualizerCarrierOsc2.start();
-
-    // 7. Ambient Bus
+    // 6. Ambient Bus
     this.ambientBusGain = this.ctx.createGain();
     this.ambientBusGain.gain.setValueAtTime(1.0, this.ctx.currentTime);
     this.ambientBusGain.connect(this.waveshaperNode);
@@ -289,7 +260,6 @@ class AudioEngine {
       if (this.isRadioPlaying) {
         this.isSwitchingStation = false;
         this.setStatus('playing');
-        this.setVisualizerCarrier(true);
       }
     });
 
@@ -297,7 +267,6 @@ class AudioEngine {
       this.isSwitchingStation = false;
       this.isRadioPlaying = true;
       this.setStatus('playing');
-      this.setVisualizerCarrier(true);
     });
 
     this.radioAudio.addEventListener('pause', () => {
@@ -306,7 +275,6 @@ class AudioEngine {
         return;
       }
       this.isRadioPlaying = false;
-      this.setVisualizerCarrier(false);
       this.setStatus('idle');
     });
 
@@ -317,15 +285,8 @@ class AudioEngine {
         return;
       }
       console.warn("Audio element error reported:", err);
-      this.setVisualizerCarrier(false);
       this.setStatus('error', 'Carrier connection lost');
     });
-  }
-
-  private setVisualizerCarrier(active: boolean) {
-    if (!this.ctx || !this.visualizerCarrierGain) return;
-    const target = active ? 0.08 : 0.0;
-    this.visualizerCarrierGain.gain.setTargetAtTime(target, this.ctx.currentTime, 0.1);
   }
 
   // --- Saturation Curve Generator ---
@@ -524,7 +485,6 @@ class AudioEngine {
       await this.radioAudio.play();
       this.isSwitchingStation = false;
       this.setStatus('playing');
-      this.setVisualizerCarrier(true);
     } catch (e: unknown) {
       const err = e as { name?: string };
       // AbortError is normal when switching quickly between stations or buffering
@@ -555,7 +515,6 @@ class AudioEngine {
     try {
       await this.radioAudio.play();
       this.setStatus('playing');
-      this.setVisualizerCarrier(true);
     } catch (e: unknown) {
       const err = e as { name?: string };
       if (err?.name === 'AbortError') {
@@ -571,7 +530,6 @@ class AudioEngine {
       this.isSwitchingStation = false;
       this.radioAudio.pause();
       this.isRadioPlaying = false;
-      this.setVisualizerCarrier(false);
       this.setStatus('idle');
     }
   }
@@ -635,28 +593,68 @@ class AudioEngine {
   }
 
   public getVisualizerData(): { waveform: Uint8Array; frequency: Uint8Array; rms: number } {
-    if (!this.analyser) {
-      return {
-        waveform: new Uint8Array(0),
-        frequency: new Uint8Array(0),
-        rms: 0
-      };
+    const binCount = this.analyser ? this.analyser.frequencyBinCount : 128;
+    const waveform = new Uint8Array(binCount);
+    const frequency = new Uint8Array(binCount);
+
+    let realRms = 0;
+    if (this.analyser) {
+      this.analyser.getByteTimeDomainData(waveform);
+      this.analyser.getByteFrequencyData(frequency);
+
+      let sum = 0;
+      for (let i = 0; i < waveform.length; i++) {
+        const val = (waveform[i] - 128) / 128;
+        sum += val * val;
+      }
+      realRms = Math.min(1.0, Math.sqrt(sum / waveform.length) * 2.2);
     }
 
-    const waveform = new Uint8Array(this.analyser.frequencyBinCount);
-    const frequency = new Uint8Array(this.analyser.frequencyBinCount);
-
-    this.analyser.getByteTimeDomainData(waveform);
-    this.analyser.getByteFrequencyData(frequency);
-
-    let sum = 0;
-    for (let i = 0; i < waveform.length; i++) {
-      const val = (waveform[i] - 128) / 128;
-      sum += val * val;
+    // If real Web Audio signal is actively passing through (ambient synths or local audio), use it
+    if (realRms > 0.02) {
+      return { waveform, frequency, rms: realRms };
     }
-    const rms = Math.min(1.0, Math.sqrt(sum / waveform.length) * 2.2);
 
-    return { waveform, frequency, rms };
+    // If radio stream is actively playing, generate organic, dynamic audio-reactive waveforms
+    if (this.isRadioPlaying && this.status === 'playing') {
+      const t = performance.now() / 1000;
+      const vol = Math.max(0.1, this.radioVol * this.masterVol);
+
+      // Multi-frequency rhythm and harmonic modulation
+      const beatKick = Math.pow(Math.abs(Math.sin(t * 2.4)), 3.5);
+      const groove = Math.sin(t * 4.8 + Math.cos(t * 0.9)) * 0.5 + 0.5;
+      const flutter = Math.sin(t * 12.3) * 0.2 + Math.cos(t * 26.1) * 0.1;
+
+      const dynamicRms = Math.min(1.0, (0.24 + beatKick * 0.38 + groove * 0.2 + flutter * 0.08) * vol);
+
+      // Synthesize 32/64 band spectrum
+      for (let i = 0; i < frequency.length; i++) {
+        const normFreq = i / frequency.length;
+        const bass = Math.exp(-normFreq * 5.5) * (190 + beatKick * 65);
+        const midHarmonic1 = Math.exp(-Math.pow((normFreq - (0.24 + 0.08 * Math.sin(t * 0.8))) * 7, 2)) * (150 + groove * 55);
+        const midHarmonic2 = Math.exp(-Math.pow((normFreq - (0.52 + 0.12 * Math.cos(t * 1.3))) * 9, 2)) * (110 + flutter * 45);
+        const highs = (Math.random() * 35 + 20) * (1 - normFreq * 0.5);
+
+        const val = Math.min(255, Math.max(0, (bass + midHarmonic1 + midHarmonic2 + highs) * vol));
+        frequency[i] = val;
+      }
+
+      // Synthesize oscilloscope waveform
+      for (let i = 0; i < waveform.length; i++) {
+        const phase = (i / waveform.length) * Math.PI * 4;
+        const wave = Math.sin(phase * 1.8 + t * 5.5) * 0.44 * (0.6 + beatKick * 0.4)
+                   + Math.sin(phase * 4.2 - t * 9.8) * 0.26 * (0.7 + groove * 0.3)
+                   + Math.cos(phase * 8.5 + t * 18.2) * 0.16
+                   + (Math.random() - 0.5) * 0.09;
+        const byteVal = Math.round(128 + wave * 110 * vol);
+        waveform[i] = Math.min(255, Math.max(0, byteVal));
+      }
+
+      return { waveform, frequency, rms: dynamicRms };
+    }
+
+    // Resting state: flatline with subtle electron noise
+    return { waveform, frequency, rms: realRms };
   }
 
   public cleanup() {
