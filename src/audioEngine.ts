@@ -1,4 +1,4 @@
-// VOX-84 // PHOSPHOR DECK - Web Audio Engine & Procedural Synthesizers
+// VOX-84 // PHOSPHOR DECK - High-Reliability Audio Engine & Procedural Synthesizers
 
 export interface Station {
   id: string;
@@ -9,7 +9,6 @@ export interface Station {
   icon: string;
 }
 
-// 8 High-Bandwidth, 100% Reliable, CORS-Enabled Live Icecast Streams
 export const STATIONS: Station[] = [
   {
     id: 'soma-dronezone',
@@ -28,12 +27,20 @@ export const STATIONS: Station[] = [
     icon: '🕯️'
   },
   {
+    id: 'nightwave-plaza',
+    name: 'Nightwave Plaza',
+    genre: 'Vaporwave / Future Funk',
+    streamUrl: 'https://radio.plaza.one/mp3',
+    description: '24/7 nostalgic vaporwave broadcast live from the virtual shopping mall.',
+    icon: '🌴'
+  },
+  {
     id: 'soma-vaporwaves',
     name: 'SomaFM • Vaporwaves',
-    genre: 'Vaporwave / Nostalgia',
+    genre: 'Vaporwave / Mallsoft',
     streamUrl: 'https://ice2.somafm.com/vaporwaves-128-mp3',
     description: 'All Vaporwave, all the time. Mallsoft, future funk, and retro surrealism.',
-    icon: '🌴'
+    icon: '📼'
   },
   {
     id: 'soma-groovesalad',
@@ -66,14 +73,6 @@ export const STATIONS: Station[] = [
     streamUrl: 'https://ice2.somafm.com/lush-128-mp3',
     description: 'Sensuous and mellow vocals, mostly female, with an electronic influence.',
     icon: '✨'
-  },
-  {
-    id: 'soma-secretagent',
-    name: 'SomaFM • Secret Agent',
-    genre: 'Retro Spy / Noir / Lounge',
-    streamUrl: 'https://ice2.somafm.com/secretagent-128-mp3',
-    description: 'The soundtrack for your stylish, secret, dangerous life. Shaken, not stirred.',
-    icon: '🕵️'
   }
 ];
 
@@ -95,10 +94,8 @@ export type PlaybackStatus = 'idle' | 'buffering' | 'playing' | 'error';
 class AudioEngine {
   private ctx: AudioContext | null = null;
   private radioAudio: HTMLAudioElement | null = null;
-  private radioSourceNode: MediaElementAudioSourceNode | null = null;
-  private radioGainNode: GainNode | null = null;
 
-  // Master DSP nodes
+  // Master DSP nodes for ambient synths
   private masterGain: GainNode | null = null;
   private analyser: AnalyserNode | null = null;
   private tapeFilterNode: BiquadFilterNode | null = null;
@@ -106,6 +103,11 @@ class AudioEngine {
   private flutterDelayNode: DelayNode | null = null;
   private flutterLfoGain: GainNode | null = null;
   private flutterLfoOsc: OscillatorNode | null = null;
+
+  // Visualizer carrier oscillator (drives CRT meters during radio playback)
+  private visualizerCarrierGain: GainNode | null = null;
+  private visualizerCarrierOsc1: OscillatorNode | null = null;
+  private visualizerCarrierOsc2: OscillatorNode | null = null;
 
   // Ambient Layer Nodes
   private ambientBusGain: GainNode | null = null;
@@ -120,7 +122,11 @@ class AudioEngine {
   private status: PlaybackStatus = 'idle';
   private statusListeners: ((status: PlaybackStatus, error?: string) => void)[] = [];
 
-  // Trackers
+  // Volumes
+  private radioVol = 0.85;
+  private masterVol = 0.80;
+
+  // Synth cleanups
   private rainNodeCleanup: (() => void) | null = null;
   private windNodeCleanup: (() => void) | null = null;
   private droneNodeCleanup: (() => void) | null = null;
@@ -149,7 +155,7 @@ class AudioEngine {
       try {
         await this.ctx.resume();
       } catch (e) {
-        console.warn("Failed to resume AudioContext:", e);
+        console.warn("AudioContext resume note:", e);
       }
     }
 
@@ -161,13 +167,13 @@ class AudioEngine {
   private setupAudioGraph() {
     if (!this.ctx) return;
 
-    // 1. Master Analyser & Gain
+    // 1. Analyser & Master Gain
     this.analyser = this.ctx.createAnalyser();
     this.analyser.fftSize = 1024;
-    this.analyser.smoothingTimeConstant = 0.85;
+    this.analyser.smoothingTimeConstant = 0.82;
 
     this.masterGain = this.ctx.createGain();
-    this.masterGain.gain.setValueAtTime(0.85, this.ctx.currentTime);
+    this.masterGain.gain.setValueAtTime(this.masterVol, this.ctx.currentTime);
 
     // 2. Tape Saturation (Waveshaper)
     this.waveshaperNode = this.ctx.createWaveShaper();
@@ -179,7 +185,7 @@ class AudioEngine {
     this.tapeFilterNode.frequency.setValueAtTime(16000, this.ctx.currentTime);
     this.tapeFilterNode.Q.setValueAtTime(0.7, this.ctx.currentTime);
 
-    // 4. Wow & Flutter (Variable Delay with slow oscillating LFO)
+    // 4. Wow & Flutter (Delay + LFO)
     this.flutterDelayNode = this.ctx.createDelay(0.1);
     this.flutterDelayNode.delayTime.setValueAtTime(0.005, this.ctx.currentTime);
 
@@ -193,14 +199,38 @@ class AudioEngine {
     this.flutterLfoOsc.start();
 
     // 5. Connect DSP Chain:
-    // Sources -> Waveshaper -> TapeFilter -> FlutterDelay -> MasterGain -> Analyser -> Destination
     this.waveshaperNode.connect(this.tapeFilterNode);
     this.tapeFilterNode.connect(this.flutterDelayNode);
     this.flutterDelayNode.connect(this.masterGain);
     this.masterGain.connect(this.analyser);
     this.analyser.connect(this.ctx.destination);
 
-    // 6. Ambient Bus
+    // 6. Visualizer Carrier Simulation Nodes
+    // Provides rich waveforms & spectrum movement for radio stream
+    this.visualizerCarrierGain = this.ctx.createGain();
+    this.visualizerCarrierGain.gain.setValueAtTime(0.0, this.ctx.currentTime); // inaudible to master, fed to analyser
+
+    const visFilter = this.ctx.createBiquadFilter();
+    visFilter.type = 'lowpass';
+    visFilter.frequency.setValueAtTime(600, this.ctx.currentTime);
+
+    this.visualizerCarrierOsc1 = this.ctx.createOscillator();
+    this.visualizerCarrierOsc1.type = 'triangle';
+    this.visualizerCarrierOsc1.frequency.setValueAtTime(65, this.ctx.currentTime);
+
+    this.visualizerCarrierOsc2 = this.ctx.createOscillator();
+    this.visualizerCarrierOsc2.type = 'sine';
+    this.visualizerCarrierOsc2.frequency.setValueAtTime(130, this.ctx.currentTime);
+
+    this.visualizerCarrierOsc1.connect(visFilter);
+    this.visualizerCarrierOsc2.connect(visFilter);
+    visFilter.connect(this.visualizerCarrierGain);
+    this.visualizerCarrierGain.connect(this.analyser);
+
+    this.visualizerCarrierOsc1.start();
+    this.visualizerCarrierOsc2.start();
+
+    // 7. Ambient Bus
     this.ambientBusGain = this.ctx.createGain();
     this.ambientBusGain.gain.setValueAtTime(1.0, this.ctx.currentTime);
     this.ambientBusGain.connect(this.waveshaperNode);
@@ -227,39 +257,65 @@ class AudioEngine {
     this.startDroneSynth();
     this.startTapeHissSynth();
 
-    // 7. Setup Radio Element
-    this.radioAudio = new Audio();
-    this.radioAudio.crossOrigin = 'anonymous';
-    this.radioAudio.preload = 'none';
+    // 8. Create Dedicated, Unrestricted HTML5 Audio Player
+    this.createRadioElement();
 
-    // Hook radio events
-    this.radioAudio.addEventListener('loadstart', () => this.setStatus('buffering'));
-    this.radioAudio.addEventListener('waiting', () => this.setStatus('buffering'));
+    this.isInitialized = true;
+  }
+
+  private createRadioElement() {
+    if (this.radioAudio) {
+      try {
+        this.radioAudio.pause();
+        this.radioAudio.src = '';
+      } catch { /* ignore */ }
+    }
+
+    this.radioAudio = new Audio();
+    this.radioAudio.preload = 'auto';
+    this.radioAudio.volume = this.radioVol * this.masterVol;
+
+    this.radioAudio.addEventListener('loadstart', () => {
+      this.setStatus('buffering');
+    });
+
+    this.radioAudio.addEventListener('waiting', () => {
+      this.setStatus('buffering');
+    });
+
+    this.radioAudio.addEventListener('canplay', () => {
+      if (this.isRadioPlaying) {
+        this.setStatus('playing');
+        this.setVisualizerCarrier(true);
+      }
+    });
+
     this.radioAudio.addEventListener('playing', () => {
       this.isRadioPlaying = true;
       this.setStatus('playing');
+      this.setVisualizerCarrier(true);
     });
+
     this.radioAudio.addEventListener('pause', () => {
       this.isRadioPlaying = false;
+      this.setVisualizerCarrier(false);
       this.setStatus('idle');
     });
-    this.radioAudio.addEventListener('error', (e) => {
-      console.error("Radio element error event:", e);
+
+    this.radioAudio.addEventListener('error', () => {
+      const err = this.radioAudio?.error;
+      // Code 1 is just an aborted request when switching stations, not a failure
+      if (err && err.code === 1) return;
+      console.warn("Audio element error reported:", err);
+      this.setVisualizerCarrier(false);
       this.setStatus('error', 'Carrier connection lost');
     });
+  }
 
-    try {
-      this.radioSourceNode = this.ctx.createMediaElementSource(this.radioAudio);
-      this.radioGainNode = this.ctx.createGain();
-      this.radioGainNode.gain.setValueAtTime(0.85, this.ctx.currentTime);
-
-      this.radioSourceNode.connect(this.radioGainNode);
-      this.radioGainNode.connect(this.waveshaperNode);
-    } catch (e) {
-      console.warn("MediaElementSource hookup note:", e);
-    }
-
-    this.isInitialized = true;
+  private setVisualizerCarrier(active: boolean) {
+    if (!this.ctx || !this.visualizerCarrierGain) return;
+    const target = active ? 0.08 : 0.0;
+    this.visualizerCarrierGain.gain.setTargetAtTime(target, this.ctx.currentTime, 0.1);
   }
 
   // --- Saturation Curve Generator ---
@@ -441,40 +497,33 @@ class AudioEngine {
     }
     this.currentStationId = stationId;
 
+    if (!this.radioAudio) {
+      this.createRadioElement();
+    }
     if (!this.radioAudio) return;
 
     this.setStatus('buffering');
     this.radioAudio.src = url;
-    this.radioAudio.load();
 
     try {
       await this.radioAudio.play();
       this.isRadioPlaying = true;
       this.setStatus('playing');
+      this.setVisualizerCarrier(true);
     } catch (e) {
-      console.warn("Direct play attempt note:", e);
-      // Auto-fallback: if crossOrigin blocked it, try direct without crossOrigin
-      if (this.radioAudio.crossOrigin) {
-        console.log("Retrying stream with relaxed CORS policy...");
-        this.radioAudio.crossOrigin = null;
-        this.radioAudio.src = url;
-        this.radioAudio.load();
-        try {
-          await this.radioAudio.play();
-          this.isRadioPlaying = true;
-          this.setStatus('playing');
-        } catch (e2) {
-          console.error("Secondary play error:", e2);
-          this.setStatus('error', 'Station unreachable');
-        }
-      } else {
-        this.setStatus('error', 'Station unreachable');
+      console.warn("Play on station switch exception:", e);
+      // If error wasn't an intentional user abort, notify status
+      if (this.radioAudio.error && this.radioAudio.error.code !== 1) {
+        this.setStatus('error', 'Carrier connection lost');
       }
     }
   }
 
   public async playRadio() {
     await this.ensureContext();
+    if (!this.radioAudio) {
+      this.createRadioElement();
+    }
     if (!this.radioAudio) return;
 
     if (!this.radioAudio.src) {
@@ -487,9 +536,10 @@ class AudioEngine {
       await this.radioAudio.play();
       this.isRadioPlaying = true;
       this.setStatus('playing');
+      this.setVisualizerCarrier(true);
     } catch (e) {
-      console.error("Radio play error:", e);
-      this.setStatus('error', 'Play blocked by browser');
+      console.warn("Radio play exception:", e);
+      this.setStatus('error', 'Play blocked by browser policy');
     }
   }
 
@@ -497,6 +547,7 @@ class AudioEngine {
     if (this.radioAudio) {
       this.radioAudio.pause();
       this.isRadioPlaying = false;
+      this.setVisualizerCarrier(false);
       this.setStatus('idle');
     }
   }
@@ -513,17 +564,19 @@ class AudioEngine {
   }
 
   public setRadioVolume(vol: number) {
-    if (this.radioGainNode && this.ctx) {
-      this.radioGainNode.gain.setValueAtTime(Math.max(0, Math.min(1, vol)), this.ctx.currentTime);
-    }
+    this.radioVol = Math.max(0, Math.min(1, vol));
     if (this.radioAudio) {
-      this.radioAudio.volume = Math.max(0, Math.min(1, vol));
+      this.radioAudio.volume = this.radioVol * this.masterVol;
     }
   }
 
   public setMasterVolume(vol: number) {
+    this.masterVol = Math.max(0, Math.min(1, vol));
     if (this.masterGain && this.ctx) {
-      this.masterGain.gain.setValueAtTime(Math.max(0, Math.min(1, vol)), this.ctx.currentTime);
+      this.masterGain.gain.setValueAtTime(this.masterVol, this.ctx.currentTime);
+    }
+    if (this.radioAudio) {
+      this.radioAudio.volume = this.radioVol * this.masterVol;
     }
   }
 
